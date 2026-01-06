@@ -923,14 +923,13 @@ const TradingAnalyticsDashboard: React.FC = () => {
             <Settings size={18} /> <span>Settings</span>
           </button>
         </nav>
+        <div className="sidebar-footer">InnoWeb Ventures Ltd</div>
       </aside>
 
       <main className="main-area">
         <header className="topbar">
           <div className="topbar-title">
-            <div className="logo-mark" style={{ background: "rgba(255,255,255,0.25)" }}>
-              V
-            </div>
+            <div className="brand-badge">TAD</div>
             Trading Account Analytics
           </div>
           <div className="date-pill">
