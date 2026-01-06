@@ -164,6 +164,15 @@ function computeDrawdown(series: { pnl: number }[]) {
   return maxDd;
 }
 
+const TradeLogo: React.FC<{ size?: "small" | "default" }> = ({ size = "default" }) => (
+  <div className={`logo-mark ${size === "small" ? "logo-mark--small" : ""}`}> 
+    <span className="logo-bar bar-1" />
+    <span className="logo-bar bar-2" />
+    <span className="logo-bar bar-3" />
+    <span className="logo-pip" />
+  </div>
+);
+
 const StatCard: React.FC<{ title: string; value: string; accent?: string }> = ({
   title,
   value,
@@ -878,7 +887,7 @@ const TradingAnalyticsDashboard: React.FC = () => {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="logo-mark">V</div>
+        <TradeLogo size="small" />
         <nav className="sidebar-nav">
           <button
             className={`nav-item ${activeTab === "dashboard" ? "active" : ""}`}
@@ -929,7 +938,7 @@ const TradingAnalyticsDashboard: React.FC = () => {
       <main className="main-area">
         <header className="topbar">
           <div className="topbar-title">
-            <div className="brand-badge">TAD</div>
+            <TradeLogo />
             Trading Account Analytics
           </div>
           <div className="date-pill">
