@@ -10,8 +10,8 @@
 - Main UI entry lives at `trading-analytics-dashboard/src/pages/index.tsx`.
 
 ## Deployment
-- GitHub Actions workflow: `azure-static-web-apps-lively-bush-0409b5010.yml`.
-- Deployment secret: `AZURE_STATIC_WEB_APPS_API_TOKEN_LIVELY_BUSH_0409B5010`.
+- GitHub Actions workflow: `azure-static-web-apps-kind-sand-028ea651e.yml`.
+- Deployment secret: `AZURE_STATIC_WEB_APPS_API_TOKEN_KIND_SAND_028EA651E`.
 - Do **not** commit secrets.
 
 ## API expansion
