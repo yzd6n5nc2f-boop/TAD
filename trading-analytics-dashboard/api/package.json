@@ -1,0 +1,10 @@
+{
+  "name": "tad-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "openai": "^4.0.0"
+  }
+}
