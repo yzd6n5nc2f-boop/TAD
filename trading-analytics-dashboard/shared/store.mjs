@@ -1,8 +1,43 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 const clone = (value) => {
   if (typeof globalThis.structuredClone === "function") {
     return globalThis.structuredClone(value);
   }
   return JSON.parse(JSON.stringify(value));
+};
+
+const isNode = typeof process !== "undefined" && Boolean(process.versions?.node);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const defaultDataPath = path.join(__dirname, "..", ".data", "tad-store.json");
+const dataPath = process.env.TAD_DATA_PATH || defaultDataPath;
+
+const ensureDir = () => {
+  fs.mkdirSync(path.dirname(dataPath), { recursive: true });
+};
+
+const loadFromDisk = () => {
+  try {
+    const raw = fs.readFileSync(dataPath, "utf8");
+    return JSON.parse(raw);
+  } catch (err) {
+    if (err?.code === "ENOENT") {
+      ensureDir();
+      const seeded = clone(seedData);
+      fs.writeFileSync(dataPath, JSON.stringify(seeded, null, 2));
+      return seeded;
+    }
+    throw err;
+  }
+};
+
+const saveToDisk = (data) => {
+  ensureDir();
+  const tmpPath = `${dataPath}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2));
+  fs.renameSync(tmpPath, dataPath);
 };
 
 export const seedData = {
@@ -117,36 +152,44 @@ export const seedData = {
   },
 };
 
-let store = clone(seedData);
+let store = null;
 
 export function getStore() {
+  if (!store) {
+    store = isNode ? loadFromDisk() : clone(seedData);
+  }
   return store;
 }
 
 export function resetStore() {
   store = clone(seedData);
+  if (isNode) saveToDisk(store);
   return store;
 }
 
 export function listTrades() {
-  return store.trades;
+  return getStore().trades;
 }
 
 export function addTrade(input) {
   const trade = { ...input, id: input.id ?? `T-${Date.now()}` };
-  store = { ...store, trades: [trade, ...store.trades] };
+  const current = getStore();
+  store = { ...current, trades: [trade, ...current.trades] };
+  if (isNode) saveToDisk(store);
   return trade;
 }
 
 export function listSessions() {
-  return store.sessions;
+  return getStore().sessions;
 }
 
 export function listSymbols() {
-  return store.symbols;
+  return getStore().symbols;
 }
 
 export function updateSettings(settings) {
-  store = { ...store, settings };
+  const current = getStore();
+  store = { ...current, settings };
+  if (isNode) saveToDisk(store);
   return settings;
 }
