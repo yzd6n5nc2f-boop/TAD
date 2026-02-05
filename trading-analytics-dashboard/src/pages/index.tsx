@@ -69,7 +69,41 @@ declare global {
   }
 }
 
-const monthOptions = ["Sep25", "Oct25", "Nov25", "Dec25"];
+const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function parseMonthLabel(label: string) {
+  if (!label || label.length < 5) return null;
+  const month = label.slice(0, 3);
+  const yearSuffix = label.slice(3);
+  const monthIndex = monthLabels.indexOf(month);
+  const yearNum = Number(yearSuffix);
+  if (monthIndex < 0 || !Number.isFinite(yearNum)) return null;
+  const year = yearNum < 100 ? 2000 + yearNum : yearNum;
+  return Date.UTC(year, monthIndex, 1);
+}
+
+function buildMonthOptions(trades: Trade[], fallback?: string) {
+  const map = new Map<string, number>();
+  trades.forEach((t) => {
+    const dt = new Date(t.date);
+    const ts = dt.getTime();
+    if (!Number.isFinite(ts)) return;
+    const label = monthFromDate(t.date);
+    const monthTs = Date.UTC(dt.getFullYear(), dt.getMonth(), 1);
+    const existing = map.get(label);
+    if (existing === undefined || monthTs > existing) map.set(label, monthTs);
+  });
+
+  if (fallback && !map.has(fallback)) {
+    map.set(fallback, parseMonthLabel(fallback) ?? 0);
+  }
+
+  const sorted = Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([label]) => label);
+
+  return sorted.length ? sorted : fallback ? [fallback] : [];
+}
 
 const TradingViewWidget: React.FC<{ symbol: string }> = ({ symbol }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -230,6 +264,7 @@ const DashboardView: React.FC<{
   onToggleExits: () => void;
   activeMonth: string;
   onMonthChange: (m: string) => void;
+  monthOptions: string[];
 }> = ({
   trades,
   selectedTrade,
@@ -239,6 +274,7 @@ const DashboardView: React.FC<{
   onToggleExits,
   activeMonth,
   onMonthChange,
+  monthOptions,
 }) => {
   const filtered = useMemo(
     () =>
@@ -772,10 +808,11 @@ const ReportsView: React.FC<{ trades: Trade[]; currency: "GBP" | "USD" }> = ({ t
   );
 };
 
-const SettingsView: React.FC<{ settings: UserSettings; onSave: (s: UserSettings) => void }> = ({
-  settings,
-  onSave,
-}) => {
+const SettingsView: React.FC<{
+  settings: UserSettings;
+  onSave: (s: UserSettings) => void;
+  monthOptions: string[];
+}> = ({ settings, onSave, monthOptions }) => {
   const [draft, setDraft] = useState(settings);
 
   useEffect(() => setDraft(settings), [settings]);
@@ -839,6 +876,10 @@ const TradingAnalyticsDashboard: React.FC = () => {
     defaultMonth: "Dec25",
   });
   const [activeMonth, setActiveMonth] = useState(settingsState.defaultMonth);
+  const monthOptions = useMemo(
+    () => buildMonthOptions(trades, settingsState.defaultMonth),
+    [trades, settingsState.defaultMonth]
+  );
 
   useEffect(() => {
     async function load() {
@@ -856,13 +897,17 @@ const TradingAnalyticsDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setActiveMonth(settingsState.defaultMonth);
-  }, [settingsState.defaultMonth]);
+    if (!monthOptions.includes(activeMonth)) {
+      const fallback = monthOptions[0] ?? settingsState.defaultMonth;
+      if (fallback) setActiveMonth(fallback);
+    }
+  }, [monthOptions, activeMonth, settingsState.defaultMonth]);
 
   const handleAddTrade = async (input: TradeForm) => {
     const newTrade = await createTrade({ ...input });
     setTrades((prev) => [newTrade, ...prev]);
     setSelectedTrade(newTrade);
+    setActiveMonth(monthFromDate(newTrade.date));
   };
 
   const assignSession = (tradeId: string, session: string) => {
@@ -956,6 +1001,7 @@ const TradingAnalyticsDashboard: React.FC = () => {
             onToggleExits={() => setExitsOnly((v) => !v)}
             activeMonth={activeMonth}
             onMonthChange={setActiveMonth}
+            monthOptions={monthOptions}
           />
         )}
         {activeTab === "trades" && (
@@ -981,7 +1027,11 @@ const TradingAnalyticsDashboard: React.FC = () => {
           <ReportsView trades={trades} currency={settingsState.currency} />
         )}
         {activeTab === "settings" && (
-          <SettingsView settings={settingsState} onSave={handleSaveSettings} />
+          <SettingsView
+            settings={settingsState}
+            onSave={handleSaveSettings}
+            monthOptions={monthOptions}
+          />
         )}
       </main>
     </div>
