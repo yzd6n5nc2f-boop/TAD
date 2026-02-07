@@ -220,30 +220,57 @@ body {
   opacity: 0.92;
 }
 
-.header-logo-slot {
-  width: 112px;
-  height: 44px;
-  border-radius: 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.48);
-  background: rgba(255, 255, 255, 0.12);
-  display: inline-flex;
+.market-sessions {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  gap: 8px;
 }
 
-.header-logo-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  padding: 4px;
+.market-session-chip {
+  min-width: 88px;
+  border-radius: 12px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  gap: 2px;
 }
 
-.header-logo-placeholder {
+.market-session-chip.open {
+  background: rgba(22, 163, 74, 0.2);
+  border-color: rgba(187, 247, 208, 0.55);
+}
+
+.market-session-chip.closed {
+  background: rgba(220, 38, 38, 0.18);
+  border-color: rgba(254, 202, 202, 0.45);
+}
+
+.market-session-name {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.9;
+}
+
+.market-session-time {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.market-session-state {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  opacity: 0.82;
+}
+
+.market-session-chip.open .market-session-state {
+  color: #dcfce7;
+}
+
+.market-session-chip.closed .market-session-state {
+  color: #fee2e2;
 }
 
 .content {
@@ -285,45 +312,6 @@ body {
   background: var(--accent);
   color: #fff;
   border-color: #264b9c;
-}
-
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.switch {
-  width: 42px;
-  height: 22px;
-  background: #d1d5db;
-  border-radius: 999px;
-  position: relative;
-  transition: background 0.2s ease;
-  cursor: pointer;
-}
-
-.switch::after {
-  content: "";
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s ease;
-}
-
-.switch.on {
-  background: #2563eb;
-}
-
-.switch.on::after {
-  transform: translateX(20px);
 }
 
 .stat-grid {
@@ -494,6 +482,10 @@ body {
   box-shadow: var(--shadow);
 }
 
+.tv-controls {
+  margin-bottom: 12px;
+}
+
 .pill-muted {
   background: #e5e7eb;
   border-radius: 10px;
@@ -573,7 +565,20 @@ body {
   }
 
   .topbar-right {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .market-sessions {
+    width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .market-session-chip {
+    flex: 1 1 95px;
   }
 
   .content {

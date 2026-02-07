@@ -16,7 +16,6 @@ import {
 import {
   LayoutDashboard,
   ListOrdered,
-  Clock3,
   Boxes,
   FilePieChart,
   Settings,
@@ -26,15 +25,12 @@ import {
   MoreHorizontal,
   Upload,
   Plus,
-  Link2,
 } from "lucide-react";
 import {
   Trade,
-  Session,
   Symbol,
   Settings as UserSettings,
   listTrades,
-  listSessions,
   listSymbols,
   createTrade,
   updateSettings,
@@ -43,7 +39,6 @@ import {
 type TabKey =
   | "dashboard"
   | "trades"
-  | "sessions"
   | "symbols"
   | "tradingview"
   | "reports"
@@ -57,9 +52,7 @@ type TradeForm = {
   exit?: number;
   size: number;
   pnl: number;
-  session?: string;
   notes?: string;
-  isExitRecord?: boolean;
 };
 
 declare global {
@@ -134,7 +127,7 @@ const TradingViewWidget: React.FC<{ symbol: string }> = ({ symbol }) => {
     <div className="widget-frame" style={{ minHeight: 640 }}>
       <div className="surface-padding flex-between">
         <div>
-          <p className="card-title" style={{ margin: 0 }}>NAS100 Advanced Chart</p>
+          <p className="card-title" style={{ margin: 0 }}>{symbol} Advanced Chart</p>
           <p className="card-subtext">Powered by TradingView</p>
         </div>
         <div className="pill-muted">Live</div>
@@ -202,6 +195,110 @@ function currentMonthLabel() {
   return monthFromDate(new Date().toISOString());
 }
 
+type MarketSession = {
+  key: "london" | "newyork" | "tokyo";
+  label: string;
+  timeZone: string;
+  openHour: number;
+  openMinute: number;
+  closeHour: number;
+  closeMinute: number;
+};
+
+const MARKET_SESSIONS: MarketSession[] = [
+  {
+    key: "london",
+    label: "London",
+    timeZone: "Europe/London",
+    openHour: 8,
+    openMinute: 0,
+    closeHour: 16,
+    closeMinute: 30,
+  },
+  {
+    key: "newyork",
+    label: "New York",
+    timeZone: "America/New_York",
+    openHour: 9,
+    openMinute: 30,
+    closeHour: 16,
+    closeMinute: 0,
+  },
+  {
+    key: "tokyo",
+    label: "Tokyo",
+    timeZone: "Asia/Tokyo",
+    openHour: 9,
+    openMinute: 0,
+    closeHour: 15,
+    closeMinute: 0,
+  },
+];
+
+const TRADINGVIEW_DEFAULT_SYMBOLS = [
+  { label: "NAS100", value: "OANDA:NAS100USD" },
+  { label: "US500", value: "OANDA:SPX500USD" },
+  { label: "Gold", value: "OANDA:XAUUSD" },
+  { label: "EURUSD", value: "OANDA:EURUSD" },
+  { label: "BTCUSD", value: "BINANCE:BTCUSDT" },
+];
+
+const TRADINGVIEW_ALIASES: Record<string, string> = {
+  NAS100: "OANDA:NAS100USD",
+  US500: "OANDA:SPX500USD",
+  SPX500: "OANDA:SPX500USD",
+  XAUUSD: "OANDA:XAUUSD",
+  EURUSD: "OANDA:EURUSD",
+  BTCUSD: "BINANCE:BTCUSDT",
+  BTCUSDT: "BINANCE:BTCUSDT",
+};
+
+function zonedDateParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    weekday: "short",
+  }).formatToParts(date);
+
+  const values: Record<string, string> = {};
+  parts.forEach((part) => {
+    values[part.type] = part.value;
+  });
+
+  return {
+    hour: Number(values.hour ?? 0),
+    minute: Number(values.minute ?? 0),
+    weekday: values.weekday ?? "Mon",
+  };
+}
+
+function isMarketSessionOpen(date: Date, session: MarketSession) {
+  const { hour, minute, weekday } = zonedDateParts(date, session.timeZone);
+  if (weekday === "Sat" || weekday === "Sun") return false;
+  const currentMinutes = hour * 60 + minute;
+  const openMinutes = session.openHour * 60 + session.openMinute;
+  const closeMinutes = session.closeHour * 60 + session.closeMinute;
+  return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+}
+
+function formatSessionTime(date: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function toTradingViewSymbol(rawSymbol: string) {
+  const symbol = rawSymbol.trim().toUpperCase();
+  if (!symbol) return "";
+  if (symbol.includes(":")) return symbol;
+  return TRADINGVIEW_ALIASES[symbol] ?? symbol;
+}
+
 const TradeLogo: React.FC<{ size?: "small" | "default" }> = ({ size = "default" }) => (
   <div className={`logo-mark ${size === "small" ? "logo-mark--small" : ""}`}> 
     <span className="logo-bar bar-1" />
@@ -211,20 +308,22 @@ const TradeLogo: React.FC<{ size?: "small" | "default" }> = ({ size = "default" 
   </div>
 );
 
-const HeaderLogoSlot: React.FC = () => {
-  const [hasLogo, setHasLogo] = useState(true);
+const MarketSessionsStrip: React.FC<{ now: Date }> = ({ now }) => {
   return (
-    <div className="header-logo-slot" title="Place logo at public/branding/app-logo.png">
-      {hasLogo ? (
-        <img
-          src="/branding/app-logo.png"
-          alt="Company logo"
-          className="header-logo-image"
-          onError={() => setHasLogo(false)}
-        />
-      ) : (
-        <span className="header-logo-placeholder">LOGO</span>
-      )}
+    <div className="market-sessions" aria-label="Market session status">
+      {MARKET_SESSIONS.map((session) => {
+        const isOpen = isMarketSessionOpen(now, session);
+        return (
+          <div
+            key={session.key}
+            className={`market-session-chip ${isOpen ? "open" : "closed"}`}
+          >
+            <span className="market-session-name">{session.label}</span>
+            <span className="market-session-time">{formatSessionTime(now, session.timeZone)}</span>
+            <span className="market-session-state">{isOpen ? "Open" : "Closed"}</span>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -282,8 +381,6 @@ const DashboardView: React.FC<{
   selectedTrade?: Trade;
   onSelectTrade: (trade: Trade) => void;
   currency: "GBP" | "USD";
-  exitsOnly: boolean;
-  onToggleExits: () => void;
   activeMonth: string;
   onMonthChange: (m: string) => void;
   monthOptions: string[];
@@ -292,18 +389,13 @@ const DashboardView: React.FC<{
   selectedTrade,
   onSelectTrade,
   currency,
-  exitsOnly,
-  onToggleExits,
   activeMonth,
   onMonthChange,
   monthOptions,
 }) => {
   const filtered = useMemo(
-    () =>
-      trades
-        .filter((t) => monthFromDate(t.date) === activeMonth)
-        .filter((t) => (exitsOnly ? Boolean(t.exit) || t.isExitRecord : true)),
-    [trades, activeMonth, exitsOnly]
+    () => trades.filter((t) => monthFromDate(t.date) === activeMonth),
+    [trades, activeMonth]
   );
 
   const stats = useMemo(() => {
@@ -355,10 +447,6 @@ const DashboardView: React.FC<{
                 {m}
               </button>
             ))}
-          </div>
-          <div className="toggle" style={{ marginLeft: "auto" }}>
-            Exits only
-            <div className={`switch ${exitsOnly ? "on" : ""}`} onClick={onToggleExits} />
           </div>
         </div>
       </div>
@@ -426,7 +514,6 @@ const DashboardView: React.FC<{
               <DetailField label="Entry" value={trade.entry} />
               <DetailField label="Exit" value={trade.exit ?? "-"} />
               <DetailField label="Size" value={trade.size} />
-              <DetailField label="Session" value={trade.session ?? "-"} />
               <DetailField
                 label="P&L"
                 value={
@@ -446,7 +533,7 @@ const DashboardView: React.FC<{
       <Card title="Recent Trades">
         <div style={{ overflowX: "auto" }}>
           <table className="table">
-            <TableHeader columns={["Date", "Symbol", "Dir", "Entry", "Exit", "Size", "P&L", "Session"]} />
+            <TableHeader columns={["Date", "Symbol", "Dir", "Entry", "Exit", "Size", "P&L"]} />
             <tbody>
               {filtered.map((t) => (
                 <tr key={t.id} onClick={() => onSelectTrade(t)} style={{ cursor: "pointer" }}>
@@ -462,7 +549,6 @@ const DashboardView: React.FC<{
                   <td>{t.exit ?? "-"}</td>
                   <td>{t.size}</td>
                   <td className={t.pnl >= 0 ? "positive" : "negative"}>{formatCurrency(t.pnl, currency)}</td>
-                  <td>{t.session ?? "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -492,9 +578,7 @@ const TradesView: React.FC<{
     exit: undefined,
     size: 1,
     pnl: 0,
-    session: "London",
     notes: "",
-    isExitRecord: true,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -504,10 +588,10 @@ const TradesView: React.FC<{
   };
 
   const exportCsv = () => {
-    const header = "id,date,symbol,direction,entry,exit,size,pnl,session";
+    const header = "id,date,symbol,direction,entry,exit,size,pnl";
     const rows = trades.map(
       (t) =>
-        `${t.id},${t.date},${t.symbol},${t.direction},${t.entry},${t.exit ?? ""},${t.size},${t.pnl},${t.session ?? ""}`
+        `${t.id},${t.date},${t.symbol},${t.direction},${t.entry},${t.exit ?? ""},${t.size},${t.pnl}`
     );
     const blob = new Blob([header + "\n" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -532,7 +616,7 @@ const TradesView: React.FC<{
       >
         <div style={{ overflowX: "auto" }}>
           <table className="table">
-            <TableHeader columns={["Date", "Symbol", "Dir", "Entry", "Exit", "Size", "P&L", "Session"]} />
+            <TableHeader columns={["Date", "Symbol", "Dir", "Entry", "Exit", "Size", "P&L"]} />
             <tbody>
               {trades.map((t) => (
                 <tr key={t.id} onClick={() => onSelectTrade(t)} style={{ cursor: "pointer" }}>
@@ -543,7 +627,6 @@ const TradesView: React.FC<{
                   <td>{t.exit ?? "-"}</td>
                   <td>{t.size}</td>
                   <td className={t.pnl >= 0 ? "positive" : "negative"}>{formatCurrency(t.pnl, currency)}</td>
-                  <td>{t.session ?? "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -624,14 +707,6 @@ const TradesView: React.FC<{
               required
             />
           </label>
-          <label>
-            <div className="detail-label">Session</div>
-            <input
-              className="input"
-              value={form.session ?? ""}
-              onChange={(e) => setForm({ ...form, session: e.target.value })}
-            />
-          </label>
           <label style={{ gridColumn: "1 / -1" }}>
             <div className="detail-label">Notes</div>
             <textarea
@@ -642,83 +717,11 @@ const TradesView: React.FC<{
             />
           </label>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <label className="toggle">
-              Exits only
-              <div
-                className={`switch ${form.isExitRecord ? "on" : ""}`}
-                onClick={() => setForm({ ...form, isExitRecord: !form.isExitRecord })}
-              />
-            </label>
             <button className="button primary" type="submit">
               <Plus size={16} /> Save Trade
             </button>
           </div>
         </form>
-      </Card>
-    </div>
-  );
-};
-
-const SessionsView: React.FC<{
-  sessions: Session[];
-  trades: Trade[];
-  onAssign: (tradeId: string, session: string) => void;
-}> = ({ sessions, trades, onAssign }) => {
-  const [selectedTradeId, setSelectedTradeId] = useState(trades[0]?.id ?? "");
-  const [selectedSession, setSelectedSession] = useState(sessions[0]?.name ?? "");
-
-  return (
-    <div className="content">
-      <Card title="Sessions">
-        <table className="table">
-          <TableHeader columns={["Name", "Region", "Open", "Close"]} />
-          <tbody>
-            {sessions.map((s) => (
-              <tr key={s.name}>
-                <td>{s.name}</td>
-                <td>{s.region}</td>
-                <td>{s.open}</td>
-                <td>{s.close}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-
-      <Card title="Assign Trade to Session">
-        <div className="form-grid">
-          <label>
-            <div className="detail-label">Trade</div>
-            <select
-              className="select"
-              value={selectedTradeId}
-              onChange={(e) => setSelectedTradeId(e.target.value)}
-            >
-              {trades.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.id} — {t.symbol}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <div className="detail-label">Session</div>
-            <select
-              className="select"
-              value={selectedSession}
-              onChange={(e) => setSelectedSession(e.target.value)}
-            >
-              {sessions.map((s) => (
-                <option key={s.name} value={s.name}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <button className="button primary" onClick={() => onAssign(selectedTradeId, selectedSession)}>
-          <Link2 size={16} /> Link Trade
-        </button>
       </Card>
     </div>
   );
@@ -892,10 +895,8 @@ const SettingsView: React.FC<{
 const TradingAnalyticsDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [symbols, setSymbols] = useState<Symbol[]>([]);
   const [selectedTrade, setSelectedTrade] = useState<Trade | undefined>();
-  const [exitsOnly, setExitsOnly] = useState(false);
   const [settingsState, setSettingsState] = useState<UserSettings>({
     currency: "GBP",
     timezone: "UTC",
@@ -903,17 +904,27 @@ const TradingAnalyticsDashboard: React.FC = () => {
   });
   const [activeMonth, setActiveMonth] = useState(settingsState.defaultMonth);
   const [now, setNow] = useState(() => new Date());
+  const [selectedTradingViewSymbol, setSelectedTradingViewSymbol] = useState("OANDA:NAS100USD");
   const monthOptions = useMemo(() => buildMonthOptions(trades), [trades]);
+  const tradingViewSymbolOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    TRADINGVIEW_DEFAULT_SYMBOLS.forEach((s) => map.set(s.value, s.label));
+    symbols.forEach((s) => {
+      const tvSymbol = toTradingViewSymbol(s.symbol);
+      if (!tvSymbol) return;
+      const label = s.description ? `${s.symbol} (${s.description})` : s.symbol;
+      if (!map.has(tvSymbol)) map.set(tvSymbol, label);
+    });
+    if (!map.has(selectedTradingViewSymbol)) {
+      map.set(selectedTradingViewSymbol, selectedTradingViewSymbol);
+    }
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+  }, [symbols, selectedTradingViewSymbol]);
 
   useEffect(() => {
     async function load() {
-      const [tradeList, sessionList, symbolList] = await Promise.all([
-        listTrades(),
-        listSessions(),
-        listSymbols(),
-      ]);
+      const [tradeList, symbolList] = await Promise.all([listTrades(), listSymbols()]);
       setTrades(tradeList);
-      setSessions(sessionList);
       setSymbols(symbolList);
       if (!selectedTrade && tradeList.length) setSelectedTrade(tradeList[0]);
     }
@@ -940,12 +951,6 @@ const TradingAnalyticsDashboard: React.FC = () => {
     setTrades((prev) => [newTrade, ...prev]);
     setSelectedTrade(newTrade);
     setActiveMonth(monthFromDate(newTrade.date));
-  };
-
-  const assignSession = (tradeId: string, session: string) => {
-    setTrades((prev) =>
-      prev.map((t) => (t.id === tradeId ? { ...t, session } : t))
-    );
   };
 
   const addSymbol = (symbol: Symbol) => {
@@ -977,12 +982,6 @@ const TradingAnalyticsDashboard: React.FC = () => {
             onClick={() => setActiveTab("trades")}
           >
             <ListOrdered size={18} /> <span>Trades</span>
-          </button>
-          <button
-            className={`nav-item ${activeTab === "sessions" ? "active" : ""}`}
-            onClick={() => setActiveTab("sessions")}
-          >
-            <Clock3 size={18} /> <span>Sessions</span>
           </button>
           <button
             className={`nav-item ${activeTab === "symbols" ? "active" : ""}`}
@@ -1019,6 +1018,7 @@ const TradingAnalyticsDashboard: React.FC = () => {
             Trading Account Analytics
           </div>
           <div className="topbar-right">
+            <MarketSessionsStrip now={now} />
             <div className="date-pill">
               <CalendarDays size={16} />
               <div className="date-time-stack">
@@ -1027,7 +1027,6 @@ const TradingAnalyticsDashboard: React.FC = () => {
                 <span className="date-time-sub">{formatLiveDate(now)}</span>
               </div>
             </div>
-            <HeaderLogoSlot />
           </div>
         </header>
 
@@ -1037,8 +1036,6 @@ const TradingAnalyticsDashboard: React.FC = () => {
             selectedTrade={selectedTrade}
             onSelectTrade={setSelectedTrade}
             currency={settingsState.currency}
-            exitsOnly={exitsOnly}
-            onToggleExits={() => setExitsOnly((v) => !v)}
             activeMonth={activeMonth}
             onMonthChange={setActiveMonth}
             monthOptions={monthOptions}
@@ -1052,15 +1049,30 @@ const TradingAnalyticsDashboard: React.FC = () => {
             currency={settingsState.currency}
           />
         )}
-        {activeTab === "sessions" && (
-          <SessionsView sessions={sessions} trades={trades} onAssign={assignSession} />
-        )}
         {activeTab === "symbols" && (
           <SymbolsView symbols={symbols} onAdd={addSymbol} onRemove={removeSymbol} />
         )}
         {activeTab === "tradingview" && (
           <div className="content">
-            <TradingViewWidget symbol="OANDA:NAS100USD" />
+            <div className="surface-card surface-padding">
+              <div className="tv-controls">
+                <label>
+                  <div className="detail-label">Instrument</div>
+                  <select
+                    className="select"
+                    value={selectedTradingViewSymbol}
+                    onChange={(e) => setSelectedTradingViewSymbol(e.target.value)}
+                  >
+                    {tradingViewSymbolOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <TradingViewWidget symbol={selectedTradingViewSymbol} />
+            </div>
           </div>
         )}
         {activeTab === "reports" && (
