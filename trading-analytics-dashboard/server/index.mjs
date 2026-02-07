@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -10,6 +11,7 @@ import {
   listSessions,
   listSymbols,
   updateSettings,
+  clearStore,
 } from "../shared/store.mjs";
 import { buildAnalysisPrompt } from "../shared/analysis.mjs";
 
@@ -55,6 +57,15 @@ app.post("/api/settings", (req, res) => {
   return res.json(updateSettings(settings));
 });
 
+app.post("/api/admin/clear", (_req, res) => {
+  const state = clearStore();
+  return res.json({
+    ok: true,
+    trades: state.trades.length,
+    ts: new Date().toISOString(),
+  });
+});
+
 app.post("/api/analyze", async (req, res) => {
   try {
     const { trades, question } = req.body ?? {};
@@ -87,6 +98,17 @@ app.post("/api/analyze", async (req, res) => {
     res.status(500).json({ error: message });
   }
 });
+
+const distPath = path.join(__dirname, "..", "dist");
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+      return next();
+    }
+    return res.sendFile(path.join(distPath, "index.html"));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`TAD API server listening on http://localhost:${PORT}`);

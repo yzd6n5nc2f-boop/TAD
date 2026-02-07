@@ -164,6 +164,12 @@ body {
   font-weight: 700;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .brand-badge {
   height: 40px;
   min-width: 44px;
@@ -183,12 +189,61 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #f9fbff;
   font-weight: 600;
+}
+
+.date-time-stack {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.date-time-label {
+  font-size: 10px;
+  opacity: 0.82;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.date-time-value {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.date-time-sub {
+  font-size: 12px;
+  opacity: 0.92;
+}
+
+.header-logo-slot {
+  width: 112px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.48);
+  background: rgba(255, 255, 255, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.header-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+}
+
+.header-logo-placeholder {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.82;
 }
 
 .content {
@@ -515,6 +570,10 @@ body {
 
   .topbar-title {
     flex-wrap: wrap;
+  }
+
+  .topbar-right {
+    justify-content: space-between;
   }
 
   .content {

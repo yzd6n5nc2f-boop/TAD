@@ -2,14 +2,18 @@
   "name": "trading-analytics-dashboard",
   "private": true,
   "version": "0.1.0",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:server": "node ./server/dev.mjs",
     "dev:all": "concurrently -n web,api -c auto \"npm:dev\" \"npm:dev:server\"",
+    "db:clear": "node ./scripts/clear-db.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "start:server": "node ./server/index.mjs"
+    "start:server": "node ./server/index.mjs",
+    "desktop:dev": "concurrently -n web,desktop -c auto \"npm:dev\" \"wait-on http://127.0.0.1:5173/ && electron ./electron/main.cjs --dev\"",
+    "desktop:build": "npm run build && electron-builder --win portable"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -26,7 +30,37 @@
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",
     "concurrently": "^9.0.0",
+    "electron": "^31.0.2",
+    "electron-builder": "^24.13.3",
     "vite": "^5.0.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.innoweb.tad",
+    "productName": "TAD Analytics",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "server/**/*",
+      "shared/**/*",
+      "electron/**/*",
+      "public/**/*",
+      "src/**/*",
+      "index.html",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
   }
 }

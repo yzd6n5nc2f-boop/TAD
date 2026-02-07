@@ -22,7 +22,6 @@ import {
   Settings,
   LineChart as LineChartIcon,
   CalendarDays,
-  ChevronDown,
   Dot,
   MoreHorizontal,
   Upload,
@@ -198,6 +197,28 @@ function computeDrawdown(series: { pnl: number }[]) {
   return maxDd;
 }
 
+function formatLiveTime(date: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function formatLiveDate(date: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function currentMonthLabel() {
+  return monthFromDate(new Date().toISOString());
+}
+
 const TradeLogo: React.FC<{ size?: "small" | "default" }> = ({ size = "default" }) => (
   <div className={`logo-mark ${size === "small" ? "logo-mark--small" : ""}`}> 
     <span className="logo-bar bar-1" />
@@ -206,6 +227,24 @@ const TradeLogo: React.FC<{ size?: "small" | "default" }> = ({ size = "default" 
     <span className="logo-pip" />
   </div>
 );
+
+const HeaderLogoSlot: React.FC = () => {
+  const [hasLogo, setHasLogo] = useState(true);
+  return (
+    <div className="header-logo-slot" title="Place logo at public/branding/app-logo.png">
+      {hasLogo ? (
+        <img
+          src="/branding/app-logo.png"
+          alt="Company logo"
+          className="header-logo-image"
+          onError={() => setHasLogo(false)}
+        />
+      ) : (
+        <span className="header-logo-placeholder">LOGO</span>
+      )}
+    </div>
+  );
+};
 
 const StatCard: React.FC<{ title: string; value: string; accent?: string }> = ({
   title,
@@ -873,9 +912,10 @@ const TradingAnalyticsDashboard: React.FC = () => {
   const [settingsState, setSettingsState] = useState<UserSettings>({
     currency: "GBP",
     timezone: "UTC",
-    defaultMonth: "Dec25",
+    defaultMonth: currentMonthLabel(),
   });
   const [activeMonth, setActiveMonth] = useState(settingsState.defaultMonth);
+  const [now, setNow] = useState(() => new Date());
   const monthOptions = useMemo(
     () => buildMonthOptions(trades, settingsState.defaultMonth),
     [trades, settingsState.defaultMonth]
@@ -902,6 +942,11 @@ const TradingAnalyticsDashboard: React.FC = () => {
       if (fallback) setActiveMonth(fallback);
     }
   }, [monthOptions, activeMonth, settingsState.defaultMonth]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleAddTrade = async (input: TradeForm) => {
     const newTrade = await createTrade({ ...input });
@@ -986,8 +1031,16 @@ const TradingAnalyticsDashboard: React.FC = () => {
             <TradeLogo />
             Trading Account Analytics
           </div>
-          <div className="date-pill">
-            <CalendarDays size={16} /> Dec 1, 2025 - Dec 31, 2025 <ChevronDown size={16} />
+          <div className="topbar-right">
+            <div className="date-pill">
+              <CalendarDays size={16} />
+              <div className="date-time-stack">
+                <span className="date-time-label">Local Date & Time</span>
+                <span className="date-time-value">{formatLiveTime(now)}</span>
+                <span className="date-time-sub">{formatLiveDate(now)}</span>
+              </div>
+            </div>
+            <HeaderLogoSlot />
           </div>
         </header>
 

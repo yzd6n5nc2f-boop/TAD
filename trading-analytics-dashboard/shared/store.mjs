@@ -40,6 +40,14 @@ const saveToDisk = (data) => {
   fs.renameSync(tmpPath, dataPath);
 };
 
+const monthFromDate = (date) => {
+  const d = new Date(date);
+  const shortYear = `${d.getFullYear()}`.slice(-2);
+  return `${d.toLocaleString("en-GB", { month: "short" })}${shortYear}`;
+};
+
+const currentMonthLabel = () => monthFromDate(new Date().toISOString());
+
 export const seedData = {
   trades: [
     {
@@ -148,7 +156,7 @@ export const seedData = {
   settings: {
     currency: "GBP",
     timezone: "UTC",
-    defaultMonth: "Dec25",
+    defaultMonth: currentMonthLabel(),
   },
 };
 
@@ -163,6 +171,20 @@ export function getStore() {
 
 export function resetStore() {
   store = clone(seedData);
+  if (isNode) saveToDisk(store);
+  return store;
+}
+
+export function clearStore() {
+  const current = getStore();
+  store = {
+    ...current,
+    trades: [],
+    settings: {
+      ...current.settings,
+      defaultMonth: currentMonthLabel(),
+    },
+  };
   if (isNode) saveToDisk(store);
   return store;
 }
