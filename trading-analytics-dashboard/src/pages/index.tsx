@@ -68,20 +68,7 @@ declare global {
   }
 }
 
-const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-function parseMonthLabel(label: string) {
-  if (!label || label.length < 5) return null;
-  const month = label.slice(0, 3);
-  const yearSuffix = label.slice(3);
-  const monthIndex = monthLabels.indexOf(month);
-  const yearNum = Number(yearSuffix);
-  if (monthIndex < 0 || !Number.isFinite(yearNum)) return null;
-  const year = yearNum < 100 ? 2000 + yearNum : yearNum;
-  return Date.UTC(year, monthIndex, 1);
-}
-
-function buildMonthOptions(trades: Trade[], fallback?: string) {
+function buildMonthOptions(trades: Trade[]) {
   const map = new Map<string, number>();
   trades.forEach((t) => {
     const dt = new Date(t.date);
@@ -93,15 +80,11 @@ function buildMonthOptions(trades: Trade[], fallback?: string) {
     if (existing === undefined || monthTs > existing) map.set(label, monthTs);
   });
 
-  if (fallback && !map.has(fallback)) {
-    map.set(fallback, parseMonthLabel(fallback) ?? 0);
-  }
-
   const sorted = Array.from(map.entries())
     .sort((a, b) => b[1] - a[1])
     .map(([label]) => label);
 
-  return sorted.length ? sorted : fallback ? [fallback] : [];
+  return sorted;
 }
 
 const TradingViewWidget: React.FC<{ symbol: string }> = ({ symbol }) => {
@@ -811,8 +794,8 @@ const ReportsView: React.FC<{ trades: Trade[]; currency: "GBP" | "USD" }> = ({ t
   }, [trades]);
 
   const expectancy = useMemo(() => trades.reduce((acc, t) => acc + t.pnl, 0) / (trades.length || 1), [trades]);
-  const best = useMemo(() => Math.max(...trades.map((t) => t.pnl)), [trades]);
-  const worst = useMemo(() => Math.min(...trades.map((t) => t.pnl)), [trades]);
+  const best = useMemo(() => (trades.length ? Math.max(...trades.map((t) => t.pnl)) : 0), [trades]);
+  const worst = useMemo(() => (trades.length ? Math.min(...trades.map((t) => t.pnl)) : 0), [trades]);
   const curve = useMemo(() => {
     let run = 0;
     return trades.map((t) => {
@@ -883,9 +866,13 @@ const SettingsView: React.FC<{
             <div className="detail-label">Default Month</div>
             <select
               className="select"
-              value={draft.defaultMonth}
+              value={monthOptions.includes(draft.defaultMonth) ? draft.defaultMonth : ""}
               onChange={(e) => setDraft({ ...draft, defaultMonth: e.target.value })}
+              disabled={!monthOptions.length}
             >
+              {!monthOptions.length ? (
+                <option value="">No trade months yet</option>
+              ) : null}
               {monthOptions.map((m) => (
                 <option key={m} value={m}>
                   {m}
@@ -916,10 +903,7 @@ const TradingAnalyticsDashboard: React.FC = () => {
   });
   const [activeMonth, setActiveMonth] = useState(settingsState.defaultMonth);
   const [now, setNow] = useState(() => new Date());
-  const monthOptions = useMemo(
-    () => buildMonthOptions(trades, settingsState.defaultMonth),
-    [trades, settingsState.defaultMonth]
-  );
+  const monthOptions = useMemo(() => buildMonthOptions(trades), [trades]);
 
   useEffect(() => {
     async function load() {
@@ -937,11 +921,14 @@ const TradingAnalyticsDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!monthOptions.includes(activeMonth)) {
-      const fallback = monthOptions[0] ?? settingsState.defaultMonth;
-      if (fallback) setActiveMonth(fallback);
+    if (!monthOptions.length) {
+      if (activeMonth !== "") setActiveMonth("");
+      return;
     }
-  }, [monthOptions, activeMonth, settingsState.defaultMonth]);
+    if (!monthOptions.includes(activeMonth)) {
+      setActiveMonth(monthOptions[0]);
+    }
+  }, [monthOptions, activeMonth]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
