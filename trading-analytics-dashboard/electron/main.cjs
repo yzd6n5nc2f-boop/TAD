@@ -1,6 +1,6 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, dialog } = require("electron");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { pathToFileURL } = require("node:url");
 const http = require("node:http");
 
 const isDev = process.argv.includes("--dev");
@@ -40,26 +40,17 @@ function waitForUrl(url, timeoutMs = 30000) {
   });
 }
 
-function startApiServer() {
+async function startApiServer() {
   if (apiProcess) return;
   const serverEntry = path.join(rootDir, "server", "index.mjs");
-  apiProcess = spawn(process.execPath, [serverEntry], {
-    cwd: rootDir,
-    env: {
-      ...process.env,
-      PORT: apiPort,
-    },
-    stdio: "inherit",
-  });
-
-  apiProcess.on("exit", () => {
-    apiProcess = null;
-  });
+  const mod = await import(pathToFileURL(serverEntry).href);
+  apiProcess = await mod.startServer(Number(apiPort));
 }
 
 function stopApiServer() {
   if (!apiProcess) return;
-  apiProcess.kill("SIGTERM");
+  apiProcess.close();
+  apiProcess = null;
 }
 
 async function createMainWindow() {
@@ -95,6 +86,11 @@ app.on("window-all-closed", () => {
 });
 
 app.whenReady().then(async () => {
-  startApiServer();
-  await createMainWindow();
+  try {
+    await startApiServer();
+    await createMainWindow();
+  } catch (err) {
+    dialog.showErrorBox("TAD Startup Error", err?.message || String(err));
+    app.quit();
+  }
 });
